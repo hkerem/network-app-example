@@ -1,8 +1,8 @@
 @author H. Kerem Cevahir <kerem@medratech.com>
 @copyright 2009 H. Kerem Cevahir
 @version @VERSION@
-@title An netapp Erlang/OTP application 
-@doc This is an netapp Erlang/OTP application packaged with GNU Autotools.
+@title An example network application 
+@doc This is an example network application.
 
 Autoconf allows the automatic generation of .app and .rel files.
 Support for EDoc and EUnit is provided through Automake.
