@@ -2,6 +2,7 @@ Makefile
 autom4te.cache
 config.log
 config.status
+erl_crash.dump
 *.beam
 *.app
 *.rel

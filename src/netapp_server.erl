@@ -15,12 +15,16 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+-export([accept_func/2]).
+
 -include_lib("eunit/include/eunit.hrl").
 -include("netapp.hrl").
 
 -define(SERVER, ?MODULE). 
 
--record(state, {}).
+-define(TCP_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
+
+-record(state, {ip=any, lsocket=null}).
 
 %%%===================================================================
 %%% API
@@ -32,7 +36,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+	gen_server:start_link({local, ?SERVER}, ?MODULE, #state{}, []).
 
 %%--------------------------------------------------------------------
 %% @doc Returns server state.
@@ -40,7 +44,7 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 state() ->
-    gen_server:call(?SERVER, state).
+	gen_server:call(?SERVER, state).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -50,54 +54,63 @@ state() ->
 %% @private
 %% @doc Initializes the server.
 %% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
+%%					 {ok, State, Timeout} |
+%%					 ignore |
+%%					 {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    {ok, #state{}}.
+init(State) ->
+	case gen_tcp:listen(9090, ?TCP_OPTIONS) of
+		{ok, LSocket} ->
+			NewState = State#state{lsocket = LSocket},
+			{ok, accept(NewState)};
+		{error, Reason} ->
+			{stop, Reason}
+	end.
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Handles call messages.
 %% @spec handle_call(Request, From, State) ->
-%%                  {reply, Reply, State} |
-%%                  {reply, Reply, State, Timeout} |
-%%                  {noreply, State} |
-%%                  {noreply, State, Timeout} |
-%%                  {stop, Reason, Reply, State} |
-%%                  {stop, Reason, State}
+%%				  {reply, Reply, State} |
+%%				  {reply, Reply, State, Timeout} |
+%%				  {noreply, State} |
+%%				  {noreply, State, Timeout} |
+%%				  {stop, Reason, Reply, State} |
+%%				  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_call(state, _From, State) ->
-    Reply = State,
-    {reply, Reply, State};
+	Reply = State,
+	{reply, Reply, State};
 handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+	Reply = ok,
+	{reply, Reply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Handles cast messages.
 %% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
+%%								  {noreply, State, Timeout} |
+%%								  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({accepted, _Pid}, State) ->
+	{noreply, accept(State)};
+
 handle_cast(_Msg, State) ->
-    {noreply, State}.
+	{noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Handles all non call/cast messages.
 %% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
+%%								   {noreply, State, Timeout} |
+%%								   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(_Info, State) ->
-    {noreply, State}.
+	{noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -111,7 +124,7 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-    ok.
+	ok.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -120,16 +133,38 @@ terminate(_Reason, _State) ->
 %% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+	{ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+accept(State = #state{lsocket = LSocket}) ->
+	proc_lib:spawn(?MODULE, accept_func, [self(), LSocket]),
+	io:format("zort 1 ~n"),
+	State.
+
+accept_func(Server, LSocket) ->
+	{ok, Socket} = gen_tcp:accept(LSocket),
+	gen_server:cast(Server, {accepted, self()}),
+	io:format("zort 2 ~n"),
+
+	business_logic(Socket).
+
+business_logic(Socket) ->
+	case gen_tcp:recv(Socket, 0) of
+		{ok, Data} ->
+			gen_tcp:send(Socket, Data),
+			business_logic(Socket);
+		{error, closed} ->
+			ok
+	end.
+
 length_test() ->
-    ?assert(length([1,2,3]) =:= 3).
+	?assert(length([1,2,3]) =:= 3).
 
 reverse_test() ->
-    ?assert(lists:reverse([1,2,3]) =:= [3,2,1]).
+	?assert(lists:reverse([1,2,3]) =:= [3,2,1]).
 
 sort_test() ->
-    ?assert(lists:sort([3,2,1]) =:= [1,2,3]).
+	?assert(lists:sort([3,2,1]) =:= [1,2,3]).
