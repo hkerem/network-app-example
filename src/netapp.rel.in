@@ -1,0 +1,7 @@
+%% -*-Erlang-*-
+{release, {"netapp", "@VERSION@"}, {erts, "@ERLANG_ERTS_VER@"},
+ [{kernel, "@ERLANG_LIB_VER_kernel@"},
+  {stdlib, "@ERLANG_LIB_VER_stdlib@"},
+  {netapp, "@VERSION@"}
+ ]}.
+%% vim: set filetype=erlang:

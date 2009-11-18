@@ -1,0 +1,12 @@
+Source: network-app-example
+Section: net
+Priority: optional
+Maintainer: H. Kerem Cevahir <kerem@medratech.com>
+Build-Depends: debhelper (>= 5), cdbs, autotools-dev, erlang-dev, erlang-nox
+Standards-Version: 3.8.0
+
+Package: network-app-example
+Architecture: any
+Depends: ${erlang-nox:Depends}
+Description: Example Erlang Application
+ This is an example Erlang/OTP application.

@@ -1,0 +1,11 @@
+%% -*-Erlang-*-
+{application, netapp,
+ [{description, "Example Application"},
+  {vsn, "@VERSION@"},
+  {modules, [netapp_app, netapp_sup, netapp_server]},
+  {registered, [netapp_sup, netapp_server]},
+  {applications, [kernel, stdlib]},
+  {mod, {netapp_app, []}},
+  {env, []}
+ ]}.
+%% vim: set filetype=erlang :
