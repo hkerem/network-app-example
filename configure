@@ -229,11 +229,11 @@ fi
     $as_echo "$0: In particular, zsh $ZSH_VERSION has bugs and should"
     $as_echo "$0: be upgraded to zsh 4.3.4 or later."
   else
-    $as_echo "$0: Please tell bug-autoconf@gnu.org and kerem@medratech.com
-$0: about your system, including any error possibly output
-$0: before this message. Then install a modern shell, or
-$0: manually run the script under such a shell if you do
-$0: have one."
+    $as_echo "$0: Please tell bug-autoconf@gnu.org and
+$0: kerem@medratech.com about your system, including any
+$0: error possibly output before this message. Then install
+$0: a modern shell, or manually run the script under such a
+$0: shell if you do have one."
   fi
   exit 1
 fi
@@ -1236,7 +1236,8 @@ Fine tuning of the installation directories:
   --infodir=DIR           info documentation [DATAROOTDIR/info]
   --localedir=DIR         locale-dependent data [DATAROOTDIR/locale]
   --mandir=DIR            man documentation [DATAROOTDIR/man]
-  --docdir=DIR            documentation root [DATAROOTDIR/doc/network-app-example]
+  --docdir=DIR            documentation root
+                          [DATAROOTDIR/doc/network-app-example]
   --htmldir=DIR           html documentation [DOCDIR]
   --dvidir=DIR            dvi documentation [DOCDIR]
   --pdfdir=DIR            pdf documentation [DOCDIR]
@@ -3760,8 +3761,8 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "src/example.app") CONFIG_FILES="$CONFIG_FILES src/example.app" ;;
-    "src/example.rel") CONFIG_FILES="$CONFIG_FILES src/example.rel" ;;
+    "src/netapp.app") CONFIG_FILES="$CONFIG_FILES src/netapp.app" ;;
+    "src/netapp.rel") CONFIG_FILES="$CONFIG_FILES src/netapp.rel" ;;
     "src/overview.edoc") CONFIG_FILES="$CONFIG_FILES src/overview.edoc" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
 
