@@ -2,8 +2,8 @@
 {application, netapp,
  [{description, "Example Application"},
   {vsn, "@VERSION@"},
-  {modules, [netapp_app, netapp_sup, netapp_server]},
-  {registered, [netapp_sup, netapp_server]},
+  {modules, [netapp_app, netapp_sup, netapp_acceptor, gen_server_cluster]},
+  {registered, [netapp_sup, netapp_acceptor, gen_server_cluster]},
   {applications, [kernel, stdlib]},
   {mod, {netapp_app, []}},
   {env, []}

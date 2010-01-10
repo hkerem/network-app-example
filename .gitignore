@@ -1,7 +1,10 @@
 Makefile
+Makefile.in
 autom4te.cache
 config.log
 config.status
+configure
+configure.lineno
 erl_crash.dump
 *.beam
 *.app
