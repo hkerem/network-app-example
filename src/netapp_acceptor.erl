@@ -1,10 +1,10 @@
 %%%-------------------------------------------------------------------
 %%% @author H. Kerem Cevahir <kerem@medratech.com>
 %%% @copyright 2009, H. Kerem Cevahir
-%%% @doc Example OTP server.
+%%% @doc Acceptor component for netapp.
 %%% @end
 %%%-------------------------------------------------------------------
--module(netapp_server).
+-module(netapp_acceptor).
 -author("kerem@medratech.com").
 -behaviour(gen_server).
 
@@ -141,13 +141,13 @@ code_change(_OldVsn, State, _Extra) ->
 
 accept(State = #state{lsocket = LSocket}) ->
 	proc_lib:spawn(?MODULE, accept_func, [self(), LSocket]),
-	io:format("zort 1 ~n"),
+	io:format("Socket is waiting for a new connection to accept... ~n"),
 	State.
 
 accept_func(Server, LSocket) ->
 	{ok, Socket} = gen_tcp:accept(LSocket),
 	gen_server:cast(Server, {accepted, self()}),
-	io:format("zort 2 ~n"),
+	io:format("New connection is accepted, running business routines... ~n"),
 
 	business_logic(Socket).
 
@@ -160,11 +160,3 @@ business_logic(Socket) ->
 			ok
 	end.
 
-length_test() ->
-	?assert(length([1,2,3]) =:= 3).
-
-reverse_test() ->
-	?assert(lists:reverse([1,2,3]) =:= [3,2,1]).
-
-sort_test() ->
-	?assert(lists:sort([3,2,1]) =:= [1,2,3]).

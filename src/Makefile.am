@@ -1,4 +1,4 @@
-dist_erl_DATA = netapp_app.erl netapp_sup.erl netapp_server.erl
+dist_erl_DATA = netapp_app.erl netapp_sup.erl netapp_acceptor.erl
 erldir = $(ERLANG_INSTALL_LIB_DIR_netapp)/src
 dist_hrl_DATA = netapp.hrl
 hrldir = $(ERLANG_INSTALL_LIB_DIR_netapp)/include

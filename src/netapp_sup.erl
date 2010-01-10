@@ -56,8 +56,8 @@ init([]) ->
     Shutdown = 2000,
     Type = worker,
 
-    AChild = {netapp_server, {netapp_server, start_link, []},
-	      Restart, Shutdown, Type, [netapp_server]},
+    AChild = {netapp_acceptor, {netapp_acceptor, start_link, []},
+	      Restart, Shutdown, Type, [netapp_acceptor]},
     
     {ok, {SupFlags, [AChild]}}.
 
