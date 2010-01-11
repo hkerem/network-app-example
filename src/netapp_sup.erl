@@ -56,10 +56,13 @@ init([]) ->
     Shutdown = 2000,
     Type = worker,
 
-    AChild = {netapp_acceptor, {netapp_acceptor, start_link, []},
+    AcceptorChild = {netapp_acceptor, {netapp_acceptor, start_link, []},
 	      Restart, Shutdown, Type, [netapp_acceptor]},
+
+    WorkerChild = {netapp_worker, {netapp_worker, start_cluster, []},
+	      Restart, Shutdown, Type, [netapp_worker]},
     
-    {ok, {SupFlags, [AChild]}}.
+    {ok, {SupFlags, [AcceptorChild, WorkerChild]}}.
 
 %%%===================================================================
 %%% Internal functions

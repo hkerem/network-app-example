@@ -149,14 +149,5 @@ accept_func(Server, LSocket) ->
 	gen_server:cast(Server, {accepted, self()}),
 	io:format("New connection is accepted, running business routines... ~n"),
 
-	business_logic(Socket).
-
-business_logic(Socket) ->
-	case gen_tcp:recv(Socket, 0) of
-		{ok, Data} ->
-			gen_tcp:send(Socket, Data),
-			business_logic(Socket);
-		{error, closed} ->
-			ok
-	end.
+	netapp_worker:work(Socket).
 
