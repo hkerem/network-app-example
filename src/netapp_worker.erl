@@ -23,7 +23,7 @@ start_cluster() ->
     gen_server_cluster:start(?MODULE, ?MODULE, [], []).
 
 work(Socket) ->
-    gen_server:call({global,?MODULE}, {work, Socket}).
+    gen_server:call({global,?MODULE}, {work, Socket}, infinity).
 
 stop() ->
     gen_server:call({global,?MODULE}, stop).
