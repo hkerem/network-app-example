@@ -1,2 +1,6 @@
 network-app-example
+An distributed network application example.
 
+References:
+http://www.trapexit.org/Building_a_Non-blocking_TCP_server_using_OTP_principles
+http://www.trapexit.org/A_Framework_for_Clustering_Generic_Server_Instances
