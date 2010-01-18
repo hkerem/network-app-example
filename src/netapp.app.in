@@ -1,11 +1,15 @@
-%% -*-Erlang-*-
 {application, netapp,
- [{description, "Example Application"},
+ [
+  {description, "An Example Distributed Network Application"},
   {vsn, "@VERSION@"},
-  {modules, [netapp_app, netapp_sup, netapp_acceptor, gen_server_cluster, netapp_worker]},
-  {registered, [netapp_sup, netapp_acceptor, gen_server_cluster, netapp_worker]},
+  {id, "netapp"},
+  {modules,      [netapp_app, netapp_acceptor, netapp_echo_fsm, gen_server_cluster, netapp_echo_worker]},
+  {registered,   []},
   {applications, [kernel, stdlib]},
+  %%
+  %% mod: Specify the module name to start the application, plus args
+  %%
   {mod, {netapp_app, []}},
   {env, []}
- ]}.
-%% vim: set filetype=erlang :
+ ]
+}.

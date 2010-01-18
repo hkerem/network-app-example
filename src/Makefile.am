@@ -1,4 +1,4 @@
-dist_erl_DATA = gen_server_cluster.erl netapp_app.erl netapp_sup.erl netapp_acceptor.erl netapp_worker.erl
+dist_erl_DATA = gen_server_cluster.erl netapp_app.erl netapp_acceptor.erl netapp_echo_worker.erl netapp_echo_fsm.erl
 erldir = $(ERLANG_INSTALL_LIB_DIR_netapp)/src
 dist_hrl_DATA = netapp.hrl
 hrldir = $(ERLANG_INSTALL_LIB_DIR_netapp)/include
@@ -37,3 +37,7 @@ $(html_DATA): $(dist_erl_DATA) overview.edoc
 check:
 	@echo "Running unit tests..."
 	@$(ERL) -eval "eunit:test({application,netapp})" -noshell -s init stop
+
+console:
+	@echo "Running application..."
+	@$(ERL) -boot start_sasl -sname console 
