@@ -1,5 +1,5 @@
 network-app-example
-An distributed network application example.
+A distributed network application example.
 
 References:
 http://www.trapexit.org/Building_a_Non-blocking_TCP_server_using_OTP_principles
