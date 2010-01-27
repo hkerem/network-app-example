@@ -34,6 +34,7 @@ init([]) ->
 handle_call({echo_reply, Request}, _From, State) ->
 	Value = State#state.id,
 	Reply = Request,
+	io:format("echo replied by ~s...~n", [node()]),
     {reply, Reply, State#state{id=Value+1}};
 
 handle_call(stop, _From, State) ->

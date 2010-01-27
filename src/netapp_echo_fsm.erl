@@ -78,7 +78,9 @@ init([]) ->
 
 %% Notification event coming from client
 'WAIT_FOR_DATA'({data, Data}, #state{socket=S} = State) ->
+	%% This request will be processed by clustered workers. 
 	ReplyData = netapp_echo_worker:echo_reply(Data),
+
 	ok = gen_tcp:send(S, ReplyData),
 	{next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT};
 

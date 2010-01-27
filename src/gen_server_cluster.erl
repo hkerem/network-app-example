@@ -384,7 +384,21 @@ code_change(_OldVsn, State, _Extra) ->
 %% optimization as it avoids transmitting large state terms.)
 delegate_to_target(State, TargetCall, Args) ->
     TargetModule = State#state.targetModule,
-    TargetResult = apply(TargetModule, TargetCall, Args),
+
+	%% Delegate to a random node.
+	%% By changing this part, developer can implement application specific strategies.
+	LocalServerPidList = State#state.localServerPidList,
+	RandomMax = length(LocalServerPidList) + 1,
+	TargetResult = case random:uniform(RandomMax) of
+			RandomMax ->
+				apply(TargetModule, TargetCall, Args);
+			N -> 
+				rpc:call(
+					node(lists:nth(N, LocalServerPidList)),
+					TargetModule, TargetCall, Args
+					)
+		end,
+
     %% index of state in tuple:
     IndexState = case TargetResult of
 		     {reply, _Reply, TargetStateUpdate} ->
@@ -422,12 +436,12 @@ delegate_to_target(State, TargetCall, Args) ->
 
     %% if target stop, stop all local servers. 
     %% The global server will be stopped by returning the result.
-    case (element(1,Result)==stop) and (State#state.localServerPidList/=[]) of
+    case (element(1,Result)==stop) and (LocalServerPidList/=[]) of
 	true ->
 	    Fun = fun(Pid) ->
 			  node(Pid)
 		  end,
-	    LocalServerNodeList = lists:map(Fun, State#state.localServerPidList),
+	    LocalServerNodeList = lists:map(Fun, LocalServerPidList),
 	    gen_server:multi_call(LocalServerNodeList,
 	    			  State#state.name, stopByTarget);
 	false ->
