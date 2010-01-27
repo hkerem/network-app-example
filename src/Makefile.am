@@ -40,4 +40,4 @@ check:
 
 console:
 	@echo "Running application..."
-	@$(ERL) -boot start_sasl -sname console 
+	@$(ERL) -boot start_sasl -sname console-$$$$ 
