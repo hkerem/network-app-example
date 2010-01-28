@@ -10,6 +10,10 @@
   %% mod: Specify the module name to start the application, plus args
   %%
   {mod, {netapp_app, []}},
-  {env, []}
+  {env,
+   [
+    {acceptors,[{echo,plain,2222}]},
+    {workers, [{netapp_echo_worker, start_cluster,[]}]}
+   ]}
  ]
 }.
