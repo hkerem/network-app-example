@@ -12,8 +12,11 @@
   {mod, {netapp_app, []}},
   {env,
    [
-    {acceptors,[{echo,plain,2222}]},
-    {workers, [{netapp_echo_worker, start_cluster,[]}]}
+    {protocols, [
+	  {echo, {acceptor, {2222, plain} },
+       {workers, [{netapp_echo_worker, start_cluster,[]}]}
+	  }
+	 ]}
    ]}
  ]
 }.
