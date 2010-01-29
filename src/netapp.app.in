@@ -13,7 +13,7 @@
   {env,
    [
     {protocols, [
-	  {echo, {acceptor, {2222, plain} },
+	  {echo, {acceptor, {2222, plain, netapp_echo_fsm} },
        {workers, [{netapp_echo_worker, start_cluster,[]}]}
 	  }
 	 ]}
