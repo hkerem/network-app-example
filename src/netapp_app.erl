@@ -44,16 +44,12 @@ init([ProtoConf| Protocols], ChildSpecs) ->
 	);
 
 init([], ChildSpecs) ->
-	Ret = {ok,
+	{ok,
 		{
 			_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
-			ChildSpecs
+			lists:reverse(ChildSpecs)
 		}
-	},
-	erlang:display(Ret),
-	Ret.
-
-
+	}.
 
 %%--------------------------------------------------------------------
 %% Function: stop(State) -> void()
