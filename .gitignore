@@ -16,3 +16,9 @@ src/*.html
 src/edoc-info
 src/erlang.png
 src/stylesheet.css
+debian/files
+debian/network-app-example.debhelper.log
+debian/network-app-example.substvars
+debian/network-app-example
+debian/stamp-autotools-files
+debian/stamp-makefile-build
