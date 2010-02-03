@@ -6,7 +6,7 @@
 -behaviour(gen_server).
 
 %% External API
--export([start_link/2]).
+-export([start_link/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
@@ -15,17 +15,18 @@
 -record(state, {
 				listener,	   % Listening socket
 				acceptor,	   % Asynchronous acceptor's internal reference
+				socket_sup,		% Supervisor name for FSM handlers
 				module		  % FSM handling module
 			   }).
 
 %%--------------------------------------------------------------------
-%% @spec (Port::integer(), Module) -> {ok, Pid} | {error, Reason}
+%% @spec (AcceptorName, Port::integer(), SocketSup, Module) -> {ok, Pid} | {error, Reason}
 %
 %% @doc Called by a supervisor to start the listening process.
 %% @end
 %%----------------------------------------------------------------------
-start_link(Port, Module) when is_integer(Port), is_atom(Module) ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, [Port, Module], []).
+start_link(AcceptorName, Port, SocketSup, Module) when is_integer(Port), is_atom(Module) ->
+	gen_server:start_link({local, AcceptorName}, ?MODULE, [Port, SocketSup, Module], []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -41,7 +42,7 @@ start_link(Port, Module) when is_integer(Port), is_atom(Module) ->
 %%	  Create listening socket.
 %% @end
 %%----------------------------------------------------------------------
-init([Port, Module]) ->
+init([Port, SocketSup, Module]) ->
 	process_flag(trap_exit, true),
 	Opts = [binary, {packet, 0}, {reuseaddr, true},
 			{keepalive, true}, {backlog, 30}, {active, false}],
@@ -51,6 +52,7 @@ init([Port, Module]) ->
 		{ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
 		{ok, #state{listener = Listen_socket,
 					acceptor = Ref,
+					socket_sup = SocketSup,
 					module   = Module}};
 	{error, Reason} ->
 		{stop, Reason}
@@ -94,7 +96,8 @@ handle_cast(_Msg, State) ->
 %% @private
 %%-------------------------------------------------------------------------
 handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
-			#state{listener=ListSock, acceptor=Ref, module=Module} = State) ->
+			#state{listener=ListSock, acceptor=Ref, 
+				socket_sup=SocketSup, module=Module} = State) ->
 	try
 		case set_sockopt(ListSock, CliSocket) of
 			ok	  -> ok;
@@ -103,7 +106,7 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
 
 		%% New client connected - spawn a new process using the simple_one_for_one
 		%% supervisor.
-		{ok, Pid} = netapp_app:start_client(),
+		{ok, Pid} = netapp_sup:start_client(SocketSup),
 		gen_tcp:controlling_process(CliSocket, Pid),
 		%% Instruct the new FSM that it owns the socket.
 		Module:set_socket(Pid, CliSocket),
