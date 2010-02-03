@@ -24,7 +24,7 @@ init([Worker|Workers], ChildSpecs) ->
 				Module,					% Id	   = internal id
 				Worker,					% StartFun = {M, F, A}
 				permanent,				% Restart  = permanent | transient | temporary
-				2000,					% Shutdown = brutal_kill | int() >= 0 | infinity
+				?KILL_TIMEOUT,			% Shutdown = brutal_kill | int() >= 0 | infinity
 				worker,					% Type	 = worker | supervisor
 				[Module]				% Modules  = [Module] | dynamic
 			}

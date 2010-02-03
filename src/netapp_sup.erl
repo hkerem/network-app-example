@@ -42,7 +42,7 @@ init([protocol_supervisor, ProtoConf]) ->
 				  	[AcceptorName, Port, SocketSupName, FsmModule]
 				  },										% StartFun = {M, F, A}
 				  permanent,								% Restart  = permanent | transient | temporary
-				  2000,										% Shutdown = brutal_kill | int() >= 0 | infinity
+				  ?KILL_TIMEOUT,							% Shutdown = brutal_kill | int() >= 0 | infinity
 				  worker,									% Type	 = worker | supervisor
 				  [netapp_acceptor]							% Modules  = [Module] | dynamic
 			  },
@@ -74,9 +74,9 @@ init([socket, FsmModule]) ->
 			[
 				% TCP Client
 			  {   undefined,								% Id	   = internal id
-				  {FsmModule,start_link,[]},					% StartFun = {M, F, A}
+				  {FsmModule,start_link,[]},				% StartFun = {M, F, A}
 				  temporary,								% Restart  = permanent | transient | temporary
-				  2000,										% Shutdown = brutal_kill | int() >= 0 | infinity
+				  ?KILL_TIMEOUT,							% Shutdown = brutal_kill | int() >= 0 | infinity
 				  worker,									% Type	 = worker | supervisor
 				  []										% Modules  = [Module] | dynamic
 			  }
