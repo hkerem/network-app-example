@@ -55,20 +55,28 @@ start(Name, TargetModule, TargetArgs, Options) ->
     end.
 
 %% Starts a local server if a global server is already running,
+%% if there is a global server in the same node, ignore is returned
 %% otherwise noGlobalServerRunning is returned.
 start_local_server(Name) ->
     case is_running(Name) of
 	false -> 
 	    noGlobalServerRunning;
-	true ->
+	remote ->
 	    ArgsLocalInit = {initLocal, Name},
-	    case gen_server:start({local,Name}, ?MODULE, ArgsLocalInit, []) of
-		{ok, _LocalPid}=Result ->
-		    io:format("~p started as local server.~n",[Name]),
-		    Result;
-		Else ->
-		    Else
-	    end
+		case whereis(Name) of
+		undefined ->
+			case gen_server:start({local,Name}, ?MODULE, ArgsLocalInit, []) of
+			{ok, _LocalPid}=Result ->
+				io:format("~p started as local server.~n",[Name]),
+				Result;
+			Else ->
+				Else
+			end;
+		_Else ->
+			ignore
+		end;
+	local ->
+		ignore
     end.
 
 %% Returns the global server pid and the list of all local server pids:
@@ -85,11 +93,19 @@ get_all_server_nodes(Name) ->
 	  end,
     {Fun(GlobalServerPid), lists:map(Fun, LocalServerPidList)}.
 
-%% Returns true if there is some global server running, otherwise false.
+%% Returns local if there is some global server running in local node
+%% Return remote if there is some global server running in remote node
+%% Otherwise false.
 is_running(Name) ->
     case catch get_all_server_pids(Name) of
 	{Pid, PidList} when is_pid(Pid), is_list(PidList) ->
-	    true;
+		SelfNode = node(),
+		case node(Pid) of
+		SelfNode ->
+			local;
+		_Else ->
+			remote
+	    end;
 	 _ ->
 	    false
     end.
