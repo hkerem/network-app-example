@@ -22,7 +22,12 @@ start_client(SocketSup) ->
 %% Supervisor behaviour callbacks
 %%----------------------------------------------------------------------
 init([protocol_supervisor, ProtoConf]) ->
-	{Proto, {acceptor, {Port, plain, FsmModule}}, _} = ProtoConf,
+	{
+		Proto,
+		{acceptor, {Port, plain, FsmModule}}, 
+		{workers, Workers}
+	} = ProtoConf,
+
 	AcceptorName = list_to_atom(atom_to_list(Proto) ++ "_acceptor"),
 	AcceptorSupName = list_to_atom(atom_to_list(Proto) ++ "_acceptor_sup"),
 	WorkerSupName = list_to_atom(atom_to_list(Proto) ++ "_worker_sup"),
@@ -32,7 +37,7 @@ init([protocol_supervisor, ProtoConf]) ->
 		{_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
 			[
 				% TCP Listener
-			  {   AcceptorSupName,								% Id	   = internal id
+			  {   AcceptorSupName,							% Id	   = internal id
 				  {netapp_acceptor, start_link,
 				  	[AcceptorName, Port, SocketSupName, FsmModule]
 				  },										% StartFun = {M, F, A}
@@ -42,15 +47,17 @@ init([protocol_supervisor, ProtoConf]) ->
 				  [netapp_acceptor]							% Modules  = [Module] | dynamic
 			  },
 				% Echo Worker 
-			  {   WorkerSupName,								% Id	   = internal id
-				  {netapp_echo_worker,start_cluster,[]},	% StartFun = {M, F, A}
+			  {   WorkerSupName,							% Id	   = internal id
+				  {supervisor, start_link,
+				  	[{local, WorkerSupName}, netapp_worker_sup, [Workers]]
+				  },										% StartFun = {M, F, A}
 				  permanent,								% Restart  = permanent | transient | temporary
-				  2000,										% Shutdown = brutal_kill | int() >= 0 | infinity
-				  worker,									% Type	 = worker | supervisor
-				  [netapp_echo_worker]							% Modules  = [Module] | dynamic
+				  infinity,									% Shutdown = brutal_kill | int() >= 0 | infinity
+				  supervisor,								% Type	 = worker | supervisor
+				  [netapp_worker_sup]						% Modules  = [Module] | dynamic
 			  },
 				% Client instance supervisor
-			  {   SocketSupName,
+			  {   SocketSupName,							% Id       = internal id
 				  {supervisor,start_link,[{local, SocketSupName}, ?MODULE, [socket, FsmModule]]},
 				  permanent,								% Restart  = permanent | transient | temporary
 				  infinity,									% Shutdown = brutal_kill | int() >= 0 | infinity

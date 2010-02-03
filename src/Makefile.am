@@ -4,7 +4,8 @@ dist_erl_DATA = \
 	netapp_acceptor.erl \
 	netapp_echo_worker.erl \
 	netapp_echo_fsm.erl \
-	netapp_sup.erl
+	netapp_sup.erl \
+	netapp_worker_sup.erl
 
 dist_hrl_DATA = \
 	netapp.hrl
