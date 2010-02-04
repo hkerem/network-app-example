@@ -1,5 +1,5 @@
 network-app-example
-A distributed network application example.
+An example for distributed, clustered, error tolerant TCP network server application.
 
 References:
 http://www.trapexit.org/Building_a_Non-blocking_TCP_server_using_OTP_principles
