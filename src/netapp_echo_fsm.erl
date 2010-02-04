@@ -5,11 +5,16 @@
 
 -behaviour(gen_fsm).
 
--export([start_link/0, set_socket/2]).
+-export([start_link/0,
+	set_socket/2]).
 
 %% gen_fsm callbacks
--export([init/1, handle_event/3,
-		 handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
+-export([init/1,
+	handle_event/3,
+	handle_sync_event/4,
+	handle_info/3,
+	terminate/3,
+	code_change/4]).
 
 %% FSM States
 -export([

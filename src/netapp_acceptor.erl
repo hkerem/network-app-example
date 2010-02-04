@@ -9,15 +9,18 @@
 -export([start_link/4]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-		 code_change/3]).
+-export([init/1,
+	handle_call/3,
+	handle_cast/2,
+	handle_info/2,
+	terminate/2,
+	code_change/3]).
 
--record(state, {
-				listener,	   % Listening socket
-				acceptor,	   % Asynchronous acceptor's internal reference
-				socket_sup,		% Supervisor name for FSM handlers
-				module		  % FSM handling module
-			   }).
+-record(state, {listener,		% Listening socket
+		acceptor,				% Asynchronous acceptor's internal reference
+		socket_sup,				% Supervisor name for FSM handlers
+		module					% FSM handling module
+	   }).
 
 %%--------------------------------------------------------------------
 %% @spec (AcceptorName, Port::integer(), SocketSup, Module) -> {ok, Pid} | {error, Reason}
@@ -47,15 +50,15 @@ init([Port, SocketSup, Module]) ->
 	Opts = [binary, {packet, 0}, {reuseaddr, true},
 			{keepalive, true}, {backlog, 30}, {active, false}],
 	case gen_tcp:listen(Port, Opts) of
-	{ok, Listen_socket} ->
-		%%Create first accepting process
-		{ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
-		{ok, #state{listener = Listen_socket,
-					acceptor = Ref,
-					socket_sup = SocketSup,
-					module   = Module}};
-	{error, Reason} ->
-		{stop, Reason}
+		{ok, Listen_socket} ->
+			%%Create first accepting process
+			{ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
+			{ok, #state{listener = Listen_socket,
+						acceptor = Ref,
+						socket_sup = SocketSup,
+						module   = Module}};
+		{error, Reason} ->
+			{stop, Reason}
 	end.
 
 %%-------------------------------------------------------------------------
@@ -96,8 +99,8 @@ handle_cast(_Msg, State) ->
 %% @private
 %%-------------------------------------------------------------------------
 handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
-			#state{listener=ListSock, acceptor=Ref, 
-				socket_sup=SocketSup, module=Module} = State) ->
+		#state{listener=ListSock, acceptor=Ref, 
+		socket_sup=SocketSup, module=Module} = State) ->
 	try
 		case set_sockopt(ListSock, CliSocket) of
 			ok	  -> ok;

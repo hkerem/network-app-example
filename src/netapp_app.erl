@@ -4,7 +4,9 @@
 
 -behaviour(application).
 
--export([start/2, init/1, stop/1]).
+-export([start/2,
+	init/1,
+	stop/1]).
 
 -include("netapp.hrl").
 
