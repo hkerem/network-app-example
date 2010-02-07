@@ -12,7 +12,6 @@
 -export([start_cluster/0,
 	echo_reply/1,
 	async_echo_reply/1,
-	async_echo_reply_proc/4,
 	stop/0]).
 
 %% gen_server callbacks
@@ -49,7 +48,13 @@ handle_call({echo_reply, Request}, _From, State) ->
     {reply, Reply, State#state{id=Value+1}};
 
 handle_call({async_echo_reply, Request}, From, State) ->
-	spawn_link(?MODULE, async_echo_reply_proc, [self(), Request, From, State ]),
+	Worker = self(),
+	spawn_link(fun() ->
+			Value = State#state.id,
+			Reply = Request,
+			io:format("echo replied with id=~w by ~w at ~w...~n", [Value, self(), node()]),
+			Worker ! {async_echo_reply, Reply, From, State#state{id=Value+1}}
+		end),
     {noreply, State, 5000};
 
 handle_call(stop, _From, State) ->
@@ -70,10 +75,4 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-async_echo_reply_proc(Worker, Request, From, State) -> 
-	Value = State#state.id,
-	Reply = Request,
-	io:format("echo replied with id=~w by ~w at ~w...~n", [Value, self(), node()]),
-	Worker ! {async_echo_reply, Reply, From, State#state{id=Value+1}}.
 
