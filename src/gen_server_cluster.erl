@@ -16,7 +16,10 @@
 	get_target_state/1,
 	get_all_server_pids/1,
 	get_all_server_nodes/1,
+	get_worker_pid/1,
 	is_running/1,
+	call/2,
+	cast/2,
 	stop/2,
 	link/2,
 	unlink/2]).
@@ -97,6 +100,20 @@ get_all_server_nodes(Name) ->
 			node(Pid)
 		end,
 	{Fun(GlobalServerPid), lists:map(Fun, LocalServerPidList)}.
+
+%% Return a worker node.
+get_worker_pid(Name) ->
+	gen_server:call({global,Name}, get_worker_pid).
+
+%% Calls function from a selected node from worker set
+call(Name, Req) ->
+	Pid = get_worker_pid(Name),
+	gen_server:call(Pid, Req).
+
+%% Casts function from a selected node from worker set
+cast(Name, Req) ->
+	Pid = get_worker_pid(Name),
+	gen_server:cast(Pid, Req).
 
 %% Returns local if there is some global server running in local node
 %% Returns remote if there is some global server running in remote node
@@ -208,6 +225,14 @@ handle_call(get_target_state, _From, State) ->
 %% Called by global server to get the pids of the global and all local servers.
 handle_call(get_all_server_pids, _From, State) ->
 	Reply = {State#state.globalServerPid, State#state.localServerPidList},
+	{reply, Reply, State};
+
+%% Returns a worker node
+handle_call(get_worker_pid, _From, State) ->
+	Reply = case select_worker_pid(State) of
+			manager -> self();
+			Pid -> Pid
+		end,
 	{reply, Reply, State};
 
 %% Called by global server when a local server starts and wants to get the 
@@ -384,6 +409,20 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
+%% Returns a worker pid.
+%% Returns manager for manager pid.
+select_worker_pid(State) ->
+	%% Selecting a random node.
+	%% By changing this part, developer can implement application specific strategies.
+	LocalServerPidList = State#state.localServerPidList,
+	RandomMax = length(LocalServerPidList) + 1,
+	case random:uniform(RandomMax) of
+		RandomMax ->
+			manager;
+		N -> 
+			lists:nth(N, LocalServerPidList)
+	end.
+
 %% Called by global server to delegate a gen_server callback function
 %% (handle_call, etc.) to the target module. The result returned by the
 %% target is transformed to a corresponding result for the gen_server_cluster
@@ -397,21 +436,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% optimization as it avoids transmitting large state terms.)
 delegate_to_target(State, TargetCall, Args) ->
 	TargetModule = State#state.targetModule,
-
-	%% Delegate to a random node.
-	%% By changing this part, developer can implement application specific strategies.
-	LocalServerPidList = State#state.localServerPidList,
-	RandomMax = length(LocalServerPidList) + 1,
-	TargetResult = case random:uniform(RandomMax) of
-		RandomMax ->
-			apply(TargetModule, TargetCall, Args);
-		N -> 
-			rpc:call(
-				node(lists:nth(N, LocalServerPidList)),
-				TargetModule, TargetCall, Args
-			)
-	end,
-
+	TargetResult = apply(TargetModule, TargetCall, Args),
 	%% index of state in tuple:
 	IndexState = case TargetResult of
 		{reply, _Reply, TargetStateUpdate} ->
@@ -446,12 +471,12 @@ delegate_to_target(State, TargetCall, Args) ->
 
 	%% if target stop, stop all local servers. 
 	%% The global server will be stopped by returning the result.
-	case (element(1,Result)==stop) and (LocalServerPidList/=[]) of
+	case (element(1,Result)==stop) and (State#state.localServerPidList/=[]) of
 		true ->
 			Fun = fun(Pid) ->
 					node(Pid)
 				end,
-			LocalServerNodeList = lists:map(Fun, LocalServerPidList),
+			LocalServerNodeList = lists:map(Fun, State#state.localServerPidList),
 			gen_server:multi_call(LocalServerNodeList,
 					State#state.name, stopByTarget);
 		false ->
@@ -465,9 +490,11 @@ delegate_to_target(State, TargetCall, Args) ->
 update_all_server_state(State, UpdateFun) ->
 	NewState = UpdateFun(State),
 	CastFun = fun(Pid) ->
-			gen_server:cast(Pid, {update_local_server_state,UpdateFun})
+			gen_server:cast(Pid, {update_local_server_state, UpdateFun})
 		end,
-	lists:foreach(CastFun, State#state.localServerPidList),
+	lists:foreach(CastFun, lists:delete(self(), 
+			[State#state.globalServerPid|State#state.localServerPidList]
+		)),
 	NewState.
 
 %% Called by each local server to try registering itself as the new global 

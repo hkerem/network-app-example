@@ -23,7 +23,7 @@ start_cluster() ->
     gen_server_cluster:start(?MODULE, ?MODULE, [], []).
 
 echo_reply(Request) ->
-    gen_server:call({global,?MODULE}, {echo_reply, Request}).
+    gen_server_cluster:call(?MODULE, {echo_reply, Request}).
 
 stop() ->
     gen_server:call({global,?MODULE}, stop).
@@ -34,7 +34,7 @@ init([]) ->
 handle_call({echo_reply, Request}, _From, State) ->
 	Value = State#state.id,
 	Reply = Request,
-	io:format("echo replied by ~s...~n", [node()]),
+	io:format("echo replied with id=~w by ~w at ~w...~n", [Value, self(), node()]),
     {reply, Reply, State#state{id=Value+1}};
 
 handle_call(stop, _From, State) ->
