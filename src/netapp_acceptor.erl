@@ -6,7 +6,8 @@
 -behaviour(gen_server).
 
 %% External API
--export([start_link/4]).
+-export([start_link/5,
+	accept_loop/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -17,19 +18,19 @@
 	code_change/3]).
 
 -record(state, {listener,		% Listening socket
-		acceptor,				% Asynchronous acceptor's internal reference
 		socket_sup,				% Supervisor name for FSM handlers
+		comm_type,				% Whether socket is SSL or plain
 		module					% FSM handling module
 	   }).
 
 %%--------------------------------------------------------------------
-%% @spec (AcceptorName, Port::integer(), SocketSup, Module) -> {ok, Pid} | {error, Reason}
+%% @spec (AcceptorName, Port::integer(), CommType, SocketSup, Module) -> {ok, Pid} | {error, Reason}
 %
 %% @doc Called by a supervisor to start the listening process.
 %% @end
 %%----------------------------------------------------------------------
-start_link(AcceptorName, Port, SocketSup, Module) when is_integer(Port), is_atom(Module) ->
-	gen_server:start_link({local, AcceptorName}, ?MODULE, [Port, SocketSup, Module], []).
+start_link(AcceptorName, Port, CommType, SocketSup, Module) when is_integer(Port), is_atom(Module) ->
+	gen_server:start_link({local, AcceptorName}, ?MODULE, [Port, CommType, SocketSup, Module], []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -45,18 +46,18 @@ start_link(AcceptorName, Port, SocketSup, Module) when is_integer(Port), is_atom
 %%	  Create listening socket.
 %% @end
 %%----------------------------------------------------------------------
-init([Port, SocketSup, Module]) ->
+init([Port, CommType, SocketSup, Module]) ->
 	process_flag(trap_exit, true),
 	Opts = [binary, {packet, 0}, {reuseaddr, true},
 			{keepalive, true}, {backlog, 30}, {active, false}],
 	case gen_tcp:listen(Port, Opts) of
-		{ok, Listen_socket} ->
+		{ok, ListSock} ->
 			%%Create first accepting process
-			{ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
-			{ok, #state{listener = Listen_socket,
-						acceptor = Ref,
+			State = #state{listener = ListSock,
 						socket_sup = SocketSup,
-						module   = Module}};
+						comm_type = CommType,
+						module   = Module},
+			{ok, accept(State)};
 		{error, Reason} ->
 			{stop, Reason}
 	end.
@@ -85,6 +86,9 @@ handle_call(Request, _From, State) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
+handle_cast(accepted, State) ->
+	{noreply, accept(State)};
+
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
@@ -98,38 +102,6 @@ handle_cast(_Msg, State) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
-handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
-		#state{listener=ListSock, acceptor=Ref, 
-		socket_sup=SocketSup, module=Module} = State) ->
-	try
-		case set_sockopt(ListSock, CliSocket) of
-			ok	  -> ok;
-			{error, Reason} -> exit({set_sockopt, Reason})
-		end,
-
-		%% New client connected - spawn a new process using the simple_one_for_one
-		%% supervisor.
-		{ok, Pid} = netapp_sup:start_client(SocketSup),
-		gen_tcp:controlling_process(CliSocket, Pid),
-		%% Instruct the new FSM that it owns the socket.
-		Module:set_socket(Pid, CliSocket),
-
-		%% Signal the network driver that we are ready to accept another connection
-		case prim_inet:async_accept(ListSock, -1) of
-			{ok,	NewRef} -> ok;
-			{error, NewRef} -> exit({async_accept, inet:format_error(NewRef)})
-		end,
-
-		{noreply, State#state{acceptor=NewRef}}
-	catch exit:Why ->
-		error_logger:error_msg("Error in async accept: ~p.\n", [Why]),
-		{stop, Why, State}
-	end;
-
-handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, acceptor=Ref} = State) ->
-	error_logger:error_msg("Error in socket acceptor: ~p.\n", [Error]),
-	{stop, Error, State};
-
 handle_info(_Info, State) ->
 	{noreply, State}.
 
@@ -171,3 +143,41 @@ set_sockopt(ListSock, CliSocket) ->
 	Error ->
 		gen_tcp:close(CliSocket), Error
 	end.
+
+
+accept_loop(Acceptor, 
+		State=#state{listener=ListSock, 
+			comm_type=CommType, 
+			socket_sup=SocketSup, 
+			module=Module}) ->
+    {ok, CliSocket} = gen_tcp:accept(ListSock),
+	try
+	%		ssl:ssl_accept(CliSocket,
+	%				[{verify, 0},
+	%				{cacertfile, "/home/kerem/certs/cacert.pem"},
+	%				{certfile, "/home/kerem/certs/cert.pem"},
+	%				{keyfile, "/home/kerem/certs/privkey.pem"}]),
+		case set_sockopt(ListSock, CliSocket) of
+			ok	  -> ok;
+			{error, Reason} -> exit({set_sockopt, Reason})
+		end,
+
+		%% New client connected - spawn a new process using the simple_one_for_one
+		%% supervisor.
+		{ok, Pid} = netapp_sup:start_client(SocketSup),
+		gen_tcp:controlling_process(CliSocket, Pid),
+		%% Instruct the new FSM that it owns the socket.
+		Module:set_socket(Pid, CliSocket, CommType),
+
+		%% Signal the acceptor that we are ready to accept another connection
+		gen_server:cast(Acceptor, accepted),
+
+		{noreply, State}
+	catch exit:Why ->
+		error_logger:error_msg("Error in async accept: ~p.\n", [Why]),
+		{stop, Why, State}
+	end.
+	
+accept(State) ->
+	proc_lib:spawn(?MODULE, accept_loop, [self(), State]),
+	State.
