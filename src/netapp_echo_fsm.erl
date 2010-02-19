@@ -6,7 +6,7 @@
 -behaviour(gen_fsm).
 
 -export([start_link/0,
-	set_socket/2]).
+	set_socket/3]).
 
 %% gen_fsm callbacks
 -export([init/1,
@@ -24,6 +24,7 @@
 
 -record(state, {
 				socket,	% client socket
+				comm_type, % whether socket uses ssl
 				addr	   % client address
 			   }).
 
@@ -45,8 +46,8 @@
 start_link() ->
 	gen_fsm:start_link(?MODULE, [], []).
 
-set_socket(Pid, Socket) when is_pid(Pid), is_port(Socket) ->
-	gen_fsm:send_event(Pid, {socket_ready, Socket}).
+set_socket(Pid, Socket, CommType) when is_pid(Pid) ->
+	gen_fsm:send_event(Pid, {socket_ready, Socket, CommType}).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -71,23 +72,28 @@ init([]) ->
 %%		  {stop, Reason, NewStateData}
 %% @private
 %%-------------------------------------------------------------------------
-'WAIT_FOR_SOCKET'({socket_ready, Socket}, State) when is_port(Socket) ->
+'WAIT_FOR_SOCKET'({socket_ready, Socket, CommType}, State) ->
 	% Now we own the socket
-	inet:setopts(Socket, [{active, once}, {packet, 0}, binary]),
-	{ok, {IP, _Port}} = inet:peername(Socket),
-	{next_state, 'WAIT_FOR_DATA', State#state{socket=Socket, addr=IP}, ?TIMEOUT};
+	Backend = case CommType of
+			plain -> inet;
+			ssl -> ssl
+		end,
+	Backend:setopts(Socket, [{active, once}, {packet, 0}, binary]),
+	{ok, {IP, _Port}} = Backend:peername(Socket),
+	{next_state, 'WAIT_FOR_DATA', State#state{socket=Socket, comm_type=CommType, addr=IP}, ?TIMEOUT};
+
 'WAIT_FOR_SOCKET'(Other, State) ->
 	error_logger:error_msg("State: 'WAIT_FOR_SOCKET'. Unexpected message: ~p\n", [Other]),
 	%% Allow to receive async messages
 	{next_state, 'WAIT_FOR_SOCKET', State}.
 
 %% Notification event coming from client
-'WAIT_FOR_DATA'({data, Data}, #state{socket=S} = State) ->
+'WAIT_FOR_DATA'({data, Data}, State) ->
 	%% This request will be processed by clustered workers. 
 	%% ReplyData = netapp_echo_worker:echo_reply(Data),
 	ReplyData = netapp_echo_worker:async_echo_reply(Data),
 
-	ok = gen_tcp:send(S, ReplyData),
+	ok = send(State, ReplyData),
 	{next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT};
 
 'WAIT_FOR_DATA'(timeout, State) ->
@@ -128,13 +134,25 @@ handle_sync_event(Event, _From, StateName, StateData) ->
 %%		  {stop, Reason, NewStateData}
 %% @private
 %%-------------------------------------------------------------------------
-handle_info({tcp, Socket, Bin}, StateName, #state{socket=Socket} = StateData) ->
+handle_info({tcp, Socket, Bin}, StateName, 
+		#state{socket=Socket, comm_type=plain} = StateData) ->
 	% Flow control: enable forwarding of next TCP message
 	inet:setopts(Socket, [{active, once}]),
 	?MODULE:StateName({data, Bin}, StateData);
 
+handle_info({ssl, Socket, Bin}, StateName, 
+		#state{socket=Socket, comm_type=ssl} = StateData) ->
+	% Flow control: enable forwarding of next TCP message
+	ssl:setopts(Socket, [{active, once}]),
+	?MODULE:StateName({data, Bin}, StateData);
+
 handle_info({tcp_closed, Socket}, _StateName,
-			#state{socket=Socket, addr=Addr} = StateData) ->
+			#state{socket=Socket, comm_type=plain, addr=Addr} = StateData) ->
+	error_logger:info_msg("~p Client ~p disconnected.\n", [self(), Addr]),
+	{stop, normal, StateData};
+
+handle_info({ssl_closed, Socket}, _StateName,
+			#state{socket=Socket, comm_type=ssl, addr=Addr} = StateData) ->
 	error_logger:info_msg("~p Client ~p disconnected.\n", [self(), Addr]),
 	{stop, normal, StateData};
 
@@ -159,3 +177,10 @@ terminate(_Reason, _StateName, #state{socket=Socket}) ->
 %%-------------------------------------------------------------------------
 code_change(_OldVsn, StateName, StateData, _Extra) ->
 	{ok, StateName, StateData}.
+
+send(State, Data) ->
+	Backend = case State#state.comm_type of
+			plain -> gen_tcp;
+			ssl -> ssl
+		end,
+	Backend:send(State#state.socket, Data).

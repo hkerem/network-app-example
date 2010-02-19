@@ -22,9 +22,8 @@ start_client(SocketSup) ->
 %% Supervisor behaviour callbacks
 %%----------------------------------------------------------------------
 init([protocol_supervisor, ProtoConf]) ->
-	{
-		Proto,
-		{acceptor, {Port, plain, FsmModule}}, 
+	{	Proto,
+		{acceptor, {Port, CommType, FsmModule}}, 
 		{workers, Workers}
 	} = ProtoConf,
 
@@ -39,7 +38,7 @@ init([protocol_supervisor, ProtoConf]) ->
 				% TCP Listener
 			  {   AcceptorSupName,							% Id	   = internal id
 				  {netapp_acceptor, start_link,
-				  	[AcceptorName, Port, SocketSupName, FsmModule]
+				  	[AcceptorName, Port, CommType, SocketSupName, FsmModule]
 				  },										% StartFun = {M, F, A}
 				  permanent,								% Restart  = permanent | transient | temporary
 				  ?KILL_TIMEOUT,							% Shutdown = brutal_kill | int() >= 0 | infinity

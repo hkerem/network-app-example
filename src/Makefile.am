@@ -1,5 +1,6 @@
 dist_erl_DATA = \
 	gen_server_cluster.erl \
+	netapp.erl \
 	netapp_app.erl \
 	netapp_acceptor.erl \
 	netapp_echo_worker.erl \

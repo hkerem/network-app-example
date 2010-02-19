@@ -50,7 +50,17 @@ init([Port, CommType, SocketSup, Module]) ->
 	process_flag(trap_exit, true),
 	Opts = [binary, {packet, 0}, {reuseaddr, true},
 			{keepalive, true}, {backlog, 30}, {active, false}],
-	case gen_tcp:listen(Port, Opts) of
+	
+	{Backend, Opts1} = case CommType of
+			plain -> {gen_tcp, Opts};
+			ssl -> {ssl, Opts ++
+					[{verify, 0},
+					{cacertfile, "/home/kerem/certs/cacert.pem"},
+					{certfile, "/home/kerem/certs/cert.pem"},
+					{keyfile, "/home/kerem/certs/privkey.pem"}]}
+		end,
+
+	case Backend:listen(Port, Opts1) of
 		{ok, ListSock} ->
 			%%Create first accepting process
 			State = #state{listener = ListSock,
@@ -132,50 +142,73 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% Taken from prim_inet.  We are merely copying some socket options from the
 %% listening socket to the new client socket.
-set_sockopt(ListSock, CliSocket) ->
-	true = inet_db:register_socket(CliSocket, inet_tcp),
-	case prim_inet:getopts(ListSock, [active, nodelay, keepalive, delay_send, priority, tos]) of
-	{ok, Opts} ->
-		case prim_inet:setopts(CliSocket, Opts) of
-			ok	-> ok;
-			Error -> gen_tcp:close(CliSocket), Error
-		end;
-	Error ->
-		gen_tcp:close(CliSocket), Error
+set_sockopt(ListSock, CliSocket, CommType) ->
+	true = case CommType of
+			plain -> inet_db:register_socket(CliSocket, inet_tcp);
+			ssl -> true
+		end,
+
+	{Backend,BackendClose,Opts} = case CommType of
+			plain -> {prim_inet, gen_tcp,
+						[active, nodelay, keepalive, delay_send, priority, tos]};
+			ssl -> {ssl, ssl, [active]}
+		end,
+
+	case Backend:getopts(ListSock, Opts) of
+		{ok, Opts1} ->
+			case Backend:setopts(CliSocket, Opts1) of
+				ok	-> ok;
+				Error -> BackendClose:close(CliSocket), Error
+			end;
+		Error ->
+			BackendClose:close(CliSocket), Error
 	end.
 
+do_accept(_State=#state{listener=ListSock, 
+		comm_type=CommType}) ->
+	case CommType of
+		plain -> gen_tcp:accept(ListSock);
+		ssl -> case ssl:transport_accept(ListSock) of
+				{ok, SSLSocket} -> case ssl:ssl_accept(SSLSocket) of
+						ok -> {ok, SSLSocket};
+						Else -> Else
+					end;
+				Else -> Else
+			end
+	end.
 
 accept_loop(Acceptor, 
 		State=#state{listener=ListSock, 
 			comm_type=CommType, 
 			socket_sup=SocketSup, 
 			module=Module}) ->
-    {ok, CliSocket} = gen_tcp:accept(ListSock),
-	try
-	%		ssl:ssl_accept(CliSocket,
-	%				[{verify, 0},
-	%				{cacertfile, "/home/kerem/certs/cacert.pem"},
-	%				{certfile, "/home/kerem/certs/cert.pem"},
-	%				{keyfile, "/home/kerem/certs/privkey.pem"}]),
-		case set_sockopt(ListSock, CliSocket) of
-			ok	  -> ok;
-			{error, Reason} -> exit({set_sockopt, Reason})
+
+	Backend = case CommType of 
+			plain -> gen_tcp;
+			ssl -> ssl
 		end,
 
-		%% New client connected - spawn a new process using the simple_one_for_one
-		%% supervisor.
-		{ok, Pid} = netapp_sup:start_client(SocketSup),
-		gen_tcp:controlling_process(CliSocket, Pid),
-		%% Instruct the new FSM that it owns the socket.
-		Module:set_socket(Pid, CliSocket, CommType),
+	Return = case do_accept(State) of
+		{ok, CliSocket} ->
+			case set_sockopt(ListSock, CliSocket, CommType) of
+				ok	  -> 
+					%% New client connected - spawn a new process using the simple_one_for_one
+					%% supervisor.
+					{ok, Pid} = netapp_sup:start_client(SocketSup),
+					Backend:controlling_process(CliSocket, Pid),
+					%% Instruct the new FSM that it owns the socket.
+					Module:set_socket(Pid, CliSocket, CommType),
+					ok;
+				{error, Reason} -> {error, {set_sockopt, Reason}}
+			end;
+		{error, Reason} -> {error, {do_accept, Reason}}
+	end,
+	%% Signal the acceptor that we are ready to accept another connection
+	gen_server:cast(Acceptor, accepted),
 
-		%% Signal the acceptor that we are ready to accept another connection
-		gen_server:cast(Acceptor, accepted),
-
-		{noreply, State}
-	catch exit:Why ->
-		error_logger:error_msg("Error in async accept: ~p.\n", [Why]),
-		{stop, Why, State}
+	case Return of
+		{error, Reason1} -> exit(Reason1);
+		Else -> Else
 	end.
 	
 accept(State) ->
