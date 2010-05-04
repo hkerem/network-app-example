@@ -6,7 +6,7 @@
 -behaviour(gen_server).
 
 %% External API
--export([start_link/5,
+-export([start_link/4,
 	accept_loop/2]).
 
 %% gen_server callbacks
@@ -19,18 +19,17 @@
 
 -record(state, {listener,		% Listening socket
 		socket_sup,				% Supervisor name for FSM handlers
-		comm_type,				% Whether socket is SSL or plain
-		module					% FSM handling module
+		comm_type				% Whether socket is SSL or plain
 	   }).
 
 %%--------------------------------------------------------------------
-%% @spec (AcceptorName, Port::integer(), CommType, SocketSup, Module) -> {ok, Pid} | {error, Reason}
+%% @spec (AcceptorName, Port::integer(), CommType, SocketSup) -> {ok, Pid} | {error, Reason}
 %
 %% @doc Called by a supervisor to start the listening process.
 %% @end
 %%----------------------------------------------------------------------
-start_link(AcceptorName, Port, CommType, SocketSup, Module) when is_integer(Port), is_atom(Module) ->
-	gen_server:start_link({local, AcceptorName}, ?MODULE, [Port, CommType, SocketSup, Module], []).
+start_link(AcceptorName, Port, CommType, SocketSup) when is_integer(Port) ->
+	gen_server:start_link({local, AcceptorName}, ?MODULE, [Port, CommType, SocketSup], []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -46,7 +45,7 @@ start_link(AcceptorName, Port, CommType, SocketSup, Module) when is_integer(Port
 %%	  Create listening socket.
 %% @end
 %%----------------------------------------------------------------------
-init([Port, CommType, SocketSup, Module]) ->
+init([Port, CommType, SocketSup]) ->
 	process_flag(trap_exit, true),
 	Opts = [binary, {packet, 0}, {reuseaddr, true},
 			{keepalive, true}, {backlog, 30}, {active, false}],
@@ -65,8 +64,7 @@ init([Port, CommType, SocketSup, Module]) ->
 			%%Create first accepting process
 			State = #state{listener = ListSock,
 						socket_sup = SocketSup,
-						comm_type = CommType,
-						module   = Module},
+						comm_type = CommType},
 			{ok, accept(State)};
 		{error, Reason} ->
 			{stop, Reason}
@@ -180,8 +178,7 @@ do_accept(_State=#state{listener=ListSock,
 accept_loop(Acceptor, 
 		State=#state{listener=ListSock, 
 			comm_type=CommType, 
-			socket_sup=SocketSup, 
-			module=Module}) ->
+			socket_sup=SocketSup}) ->
 
 	Backend = case CommType of 
 			plain -> gen_tcp;
@@ -197,7 +194,7 @@ accept_loop(Acceptor,
 					{ok, Pid} = netapp_sup:start_client(SocketSup),
 					Backend:controlling_process(CliSocket, Pid),
 					%% Instruct the new FSM that it owns the socket.
-					Module:set_socket(Pid, CliSocket, CommType),
+					netapp_fsm:set_socket(Pid, CliSocket, CommType),
 					ok;
 				{error, Reason} -> {error, {set_sockopt, Reason}}
 			end;

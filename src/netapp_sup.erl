@@ -38,14 +38,14 @@ init([protocol_supervisor, ProtoConf]) ->
 				% TCP Listener
 			  {   AcceptorSupName,							% Id	   = internal id
 				  {netapp_acceptor, start_link,
-				  	[AcceptorName, Port, CommType, SocketSupName, FsmModule]
+				  	[AcceptorName, Port, CommType, SocketSupName]
 				  },										% StartFun = {M, F, A}
 				  permanent,								% Restart  = permanent | transient | temporary
 				  ?KILL_TIMEOUT,							% Shutdown = brutal_kill | int() >= 0 | infinity
 				  worker,									% Type	 = worker | supervisor
 				  [netapp_acceptor]							% Modules  = [Module] | dynamic
 			  },
-				% Echo Worker 
+				% Worker supervisor
 			  {   WorkerSupName,							% Id	   = internal id
 				  {supervisor, start_link,
 				  	[{local, WorkerSupName}, netapp_worker_sup, [Workers]]
@@ -73,7 +73,7 @@ init([socket, FsmModule]) ->
 			[
 				% TCP Client
 			  {   undefined,								% Id	   = internal id
-				  {FsmModule,start_link,[]},				% StartFun = {M, F, A}
+				  {netapp_fsm,start_link,[FsmModule]},		% StartFun = {M, F, A}
 				  temporary,								% Restart  = permanent | transient | temporary
 				  ?KILL_TIMEOUT,							% Shutdown = brutal_kill | int() >= 0 | infinity
 				  worker,									% Type	 = worker | supervisor
